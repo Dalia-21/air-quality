@@ -1,6 +1,6 @@
 /*
- * This program listens for UDP packets on a specified port number
- * and prints the received packets to stdout.
+ * This program gets the host IP, usually 0.0.0.0, from the host
+ * and prints it to stdout.
  */
 
 #include <stdio.h>
