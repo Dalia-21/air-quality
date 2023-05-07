@@ -17,35 +17,39 @@
 #define MAXBUFLEN 100
 
 struct addrinfo get_udp_hints_struct();
-struct addrinfo *get_address_struct(struct addrinfo hints, char *port);
+struct addrinfo *get_local_address_struct(struct addrinfo hints, char *port);
 void check_for_error(int status, char *msg);
 uint16_t get_port_number(struct sockaddr *s);
 int get_available_socket(struct addrinfo *a);
 char *receive_udp_packet(int sockfd);
+int get_socket(char *port);
 
 int main(int argc, char *argv[]) {
-	int return_status;
 	char *buf;
+	int sockfd = get_socket(PORT_NO);
 
-	struct addrinfo address_hints = get_udp_hints_struct();
-	struct addrinfo *server_info = get_address_struct(address_hints, PORT_NO);
-
-	int socket_fd = get_available_socket(server_info);
-
-	int yes = 1;
-	return_status = setsockopt(socket_fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof yes);
-	check_for_error(return_status, "setsockopt failed");
-
-	freeaddrinfo(server_info); // Info is not required once socket is bound
-
-	buf = receive_udp_packet(socket_fd);
+	buf = receive_udp_packet(sockfd);
 
 	printf("Received message: %s\n", buf);
 
-	close(socket_fd);
+	close(sockfd);
 	free(buf);
 
 	return 0;
+}
+
+int get_socket(char *port) {
+	struct addrinfo hints = get_udp_hints_struct();
+	struct addrinfo *server_info = get_local_address_struct(hints, port);
+	int sockfd = get_available_socket(server_info);
+
+	int yes = 1;
+	int return_status = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof yes);
+	check_for_error(return_status, "setsockopt failed");
+
+	freeaddrinfo(server_info); // Info not required once socket is bound
+	
+	return sockfd;
 }
 
 struct addrinfo get_udp_hints_struct() {
@@ -57,7 +61,7 @@ struct addrinfo get_udp_hints_struct() {
 	return address_hints;
 }
 
-struct addrinfo *get_address_struct(struct addrinfo hints, char *port) {
+struct addrinfo *get_local_address_struct(struct addrinfo hints, char *port) {
 	struct addrinfo *server_info;
 	int return_status = getaddrinfo(NULL, port, &hints, &server_info);
 	if (return_status) {
