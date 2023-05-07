@@ -11,38 +11,39 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <errno.h>
+#include <unistd.h>
+
+#define PORT_NO "2345"
+#define MAXBUFLEN 100
 
 struct addrinfo get_udp_hints_struct();
 struct addrinfo *get_address_struct(struct addrinfo hints, char *port);
 void check_for_error(int status, char *msg);
 uint16_t get_port_number(struct sockaddr *s);
+int get_available_socket(struct addrinfo *a);
+char *receive_udp_packet(int sockfd);
 
 int main(int argc, char *argv[]) {
 	int return_status;
+	char *buf;
+
 	struct addrinfo address_hints = get_udp_hints_struct();
-	int socket_fd;
-	char *port = "2345";
-	
-	struct addrinfo *server_info = get_address_struct(address_hints, port);
+	struct addrinfo *server_info = get_address_struct(address_hints, PORT_NO);
 
-	socket_fd = socket(server_info->ai_family, server_info->ai_socktype, server_info->ai_protocol);
-
-	if (socket_fd == -1) {
-		perror("failed to get socket");
-		exit(EXIT_FAILURE);
-	}
-
-	return_status = bind(socket_fd, server_info->ai_addr, server_info->ai_addrlen);
-	check_for_error(return_status, "binding to port failed");
+	int socket_fd = get_available_socket(server_info);
 
 	int yes = 1;
 	return_status = setsockopt(socket_fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof yes);
 	check_for_error(return_status, "setsockopt failed");
 
-	uint16_t port_number = get_port_number(server_info->ai_addr);
-	printf("Port no: %d\n", port_number);
+	freeaddrinfo(server_info); // Info is not required once socket is bound
 
-	freeaddrinfo(server_info);
+	buf = receive_udp_packet(socket_fd);
+
+	printf("Received message: %s\n", buf);
+
+	close(socket_fd);
+	free(buf);
 
 	return 0;
 }
@@ -76,6 +77,49 @@ uint16_t get_port_number(struct sockaddr *s) {
 	port_number = htons(sin->sin_port);
 
 	return port_number;
+}
+
+int get_available_socket(struct addrinfo *a) {
+	// Iterate through the addrinfo linked list until a valid socket is bound
+	int sockfd;
+	for (; a != NULL; a = a->ai_next) {
+		if ((sockfd = socket(a->ai_family, a->ai_socktype, a->ai_protocol)) == -1) {
+			perror("listener: socket");
+			continue;
+		}
+
+		if (bind(sockfd, a->ai_addr, a->ai_addrlen) == -1) {
+			close(sockfd);
+			perror("listener: bind");
+			continue;
+		}
+
+		break; // If code reaches this point, binding was successful
+	}
+
+	if (a == NULL) {
+		fprintf(stderr, "listener: failed to bind socket\n");
+		exit(EXIT_FAILURE);
+	}
+
+	return sockfd;
+}
+
+char *receive_udp_packet(int sockfd) {
+	int numbytes;
+	struct sockaddr_storage sender_addr;
+	char *buf = malloc(MAXBUFLEN);
+	socklen_t addr_len;
+
+	if ((numbytes = recvfrom(sockfd, buf, MAXBUFLEN-1, 0,
+					(struct sockaddr *)&sender_addr, &addr_len)) == -1) {
+		perror("recvfrom");
+		exit(EXIT_FAILURE);
+	}
+
+	buf[numbytes] = '\0';
+
+	return buf;
 }
 
 void check_for_error(int status, char *msg) {
