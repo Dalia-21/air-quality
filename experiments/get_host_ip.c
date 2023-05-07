@@ -30,6 +30,8 @@ int main(int argc, char *argv[]) {
 
 	printf("IP address: %s\n", ipstr);
 
+	freeaddrinfo(&address_hints);
+	freeaddrinfo(server_info);
 
 	return 0;
 }
@@ -40,6 +42,7 @@ struct addrinfo *get_address_struct(struct addrinfo hints, char *port) {
 	if (return_status) {
 		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(return_status));
 		exit(EXIT_FAILURE);
+		freeaddrinfo(server_info);
 	}
 	return server_info;
 }
