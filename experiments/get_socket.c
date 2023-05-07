@@ -12,20 +12,16 @@
 #include <arpa/inet.h>
 #include <errno.h>
 
+struct addrinfo get_udp_hints_struct();
 struct addrinfo *get_address_struct(struct addrinfo hints, char *port);
 void check_for_error(int status, char *msg);
 uint16_t get_port_number(struct sockaddr *s);
 
 int main(int argc, char *argv[]) {
 	int return_status;
-	struct addrinfo address_hints;
+	struct addrinfo address_hints = get_udp_hints_struct();
 	int socket_fd;
 	char *port = "2345";
-
-	memset(&address_hints, 0, sizeof address_hints);
-	address_hints.ai_family = AF_INET; // IPv4
-	address_hints.ai_socktype = SOCK_DGRAM; // UDP
-	address_hints.ai_flags = AI_PASSIVE; // Accept the host's IP address
 	
 	struct addrinfo *server_info = get_address_struct(address_hints, port);
 
@@ -46,10 +42,18 @@ int main(int argc, char *argv[]) {
 	uint16_t port_number = get_port_number(server_info->ai_addr);
 	printf("Port no: %d\n", port_number);
 
-	freeaddrinfo(&address_hints);
 	freeaddrinfo(server_info);
 
 	return 0;
+}
+
+struct addrinfo get_udp_hints_struct() {
+	struct addrinfo address_hints;
+	memset(&address_hints, 0, sizeof address_hints);
+	address_hints.ai_family = AF_INET; // IPv4
+	address_hints.ai_socktype = SOCK_DGRAM; // UDP
+	address_hints.ai_flags = AI_PASSIVE; // Accept the host's IP address
+	return address_hints;
 }
 
 struct addrinfo *get_address_struct(struct addrinfo hints, char *port) {
